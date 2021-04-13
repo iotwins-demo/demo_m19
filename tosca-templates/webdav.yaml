@@ -1,0 +1,76 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+imports:
+  - indigo_custom_types: https://github.com/indigo-dc/tosca-types/raw/master/custom_types.yaml
+
+description: >
+  WebDav server
+
+metadata:
+  display_name: WebDav
+
+topology_template:
+
+  inputs:
+
+    cpus:
+      type: float
+      description: Amount of CPUs for this service
+      required: yes
+      default: 1.0
+    
+    mem:
+      type: scalar-unit.size
+      description: Amount of Memory for this service
+      required: yes 
+      default: 1 GB
+
+    webdav_username:
+      type: string
+      description: Username for webdav access
+      required: no
+      default: admin
+
+    webdav_password:
+      type: string
+      description: Password for webdav access
+      required: yes
+
+  node_templates:
+
+    marathon:
+      type: tosca.nodes.indigo.Container.Application.Docker.Marathon
+      properties:
+        environment_variables: 
+          USERNAME: { get_input: webdav_username }
+          PASSWORD: { get_input: webdav_password }
+          AUTH_TYPE: Digest
+        uris: []
+      artifacts:
+        image:
+          file: bytemark/webdav
+          type: tosca.artifacts.Deployment.Image.Container.Docker
+      requirements:
+        - host: docker_runtime
+
+    docker_runtime:
+      type: tosca.nodes.indigo.Container.Runtime.Docker
+      capabilities:
+        host:
+          properties:
+            num_cpus: { get_input: cpus}
+            mem_size: { get_input: mem}
+            publish_ports:
+               - protocol: tcp
+                 source: 80
+  policies:
+  - deploy_on_specific_site:
+      type: tosca.policies.indigo.SlaPlacement
+      properties:
+        sla_id: 6053c86b708a18be8b8c562f
+
+
+  outputs:
+    endpoint: 
+      value:  { concat: [ "http://", { get_attribute : [ marathon, load_balancer_ips, 0 ] }, ':', { get_attribute : [ docker_runtime, host, publish_ports, 0, target ] } ] }
+

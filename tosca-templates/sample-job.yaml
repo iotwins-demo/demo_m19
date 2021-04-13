@@ -1,0 +1,80 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+imports:
+  - indigo_custom_types: https://raw.githubusercontent.com/indigo-dc/tosca-types/master/custom_types.yaml
+
+description: "Run a simple job"
+
+topology_template:
+  inputs:
+
+    cpus:
+      type: float
+      default: 1
+      description: Amount of CPUs for this job
+      required: yes
+
+    mem:
+      type: string
+      description: Amount of Memory for this job
+      required: yes
+      constraints:
+        - valid_values: [ '1024 MB', '2048 MB' ]
+
+    webdav_url:
+      type: string
+      required: yes
+
+    webdav_username:
+      type: string
+      required: yes
+      default: admin
+
+    webdav_password:
+      type: string
+      required: yes
+
+    webdav_mountpoint:
+      type: string
+      required: yes
+      default: /mnt/demo
+
+    input_filename:
+      type: string
+      required: yes
+
+    output_path:
+      type: string
+      required: yes
+
+  node_templates:
+
+    preprocessing_job:
+      type: tosca.nodes.indigo.Container.Application.Docker.Chronos
+      properties:
+        command: '/run.sh'
+        retries: 3
+        privileged: true
+        environment_variables:
+          WEBDRIVE_USERNAME: { get_input: webdav_username }
+          WEBDRIVE_PASSWORD: { get_input: webdav_password }
+          WEBDRIVE_URL: { get_input: webdav_url }
+          WEBDRIVE_MOUNT: { get_input: webdav_mountpoint }
+          INPUT_FILENAME: { get_input: input_filename }
+          OUTPUT_PATH: { get_input: output_path }
+
+      artifacts:
+        image:
+          file: 'marica/demo'
+          type: tosca.artifacts.Deployment.Image.Container.Docker
+      requirements:
+        - host: docker_runtime
+
+
+    docker_runtime:
+      type: tosca.nodes.indigo.Container.Runtime.Docker
+      capabilities:
+        host:
+          properties:
+            num_cpus: { get_input: cpus }
+            mem_size: { get_input: mem }
